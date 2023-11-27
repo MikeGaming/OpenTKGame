@@ -37,6 +37,8 @@ public class Skybox
     public void Render()
     {
         
+        MyShader.Use();
+        
         _view = new Matrix4(new Matrix3(Game.GameCam.GetViewMatrix()));
         
         int id = MyShader.GetUniformLocation("view");
@@ -55,7 +57,7 @@ public class Skybox
     
     public void Dispose()
     {
-        GL.DeleteBuffer(_vertexBufferObject);
         GL.DeleteVertexArray(_vertexArrayObject);
+        GL.DeleteBuffer(_vertexBufferObject);
     }
 }

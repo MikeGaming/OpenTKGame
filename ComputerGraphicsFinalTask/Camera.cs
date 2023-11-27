@@ -11,7 +11,8 @@ public class Camera
     public Vector3 Up;
     public Vector3 Right;
 
-    
+    public Vector3 WorldRight;
+    public Vector3 WorldUp;
     
     // Rotation around the X axis (radians)
     private float _pitch = 0;
@@ -58,6 +59,15 @@ public class Camera
     public Matrix4 GetViewMatrix()
     {
         return Matrix4.LookAt(Position, Position + Forward, Up);
+    }
+
+    public Vector3 GetWorldRight()
+    {
+        return new Vector3(GetViewMatrix()[0, 0], GetViewMatrix()[1, 0], GetViewMatrix()[2, 0]);
+    }
+    public Vector3 GetWorldUp()
+    {
+        return new Vector3(GetViewMatrix()[0, 1], GetViewMatrix()[1, 1], GetViewMatrix()[2, 1]);
     }
 
     public Matrix4 GetProjectionMatrix()

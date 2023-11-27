@@ -26,31 +26,33 @@ public class GameObject
         _vertexBufferObject = GL.GenBuffer();
         GL.BindBuffer(BufferTarget.ArrayBuffer, _vertexBufferObject);
         GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
-        StaticUtilities.CheckError("2");
+            
+        //Static draw means not moving
+        //DYNAMIC meaning data changes often
+        //STREAM data is ALWAYS changing
+            
         //VAO
         _vertexArrayObject = GL.GenVertexArray();
         GL.BindVertexArray(_vertexArrayObject);
-        
-        int id = 0;
+
+        int id = MyShader.GetAttribLocation("vertexPosition");
         GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 0);
         GL.EnableVertexAttribArray(id);
-
-        id = 1;// shader.GetAttribLocation("aNormals");
+        
+        id = MyShader.GetAttribLocation("vertexNormals");
         GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 3 * sizeof(float));
         GL.EnableVertexAttribArray(id);
-        StaticUtilities.CheckError("3");
-
-        id = 2;
-        GL.VertexAttribPointer(id, 2, VertexAttribPointerType.Float, false, 8 * sizeof(float), 6 * sizeof(float));
+            
+        id = MyShader.GetAttribLocation("UVs");
+        GL.VertexAttribPointer(id, 2, VertexAttribPointerType.Float,
+            false, 8 * sizeof(float), 6 * sizeof(float));
         GL.EnableVertexAttribArray(id);
-        StaticUtilities.CheckError("4");
-
+            
         //EBO
+            
         _elementBufferObject = GL.GenBuffer();
         GL.BindBuffer(BufferTarget.ElementArrayBuffer, _elementBufferObject);
-        GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices,
-            BufferUsageHint.StaticDraw);
-        StaticUtilities.CheckError("5");
+        GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
     }
 
     public void Render()

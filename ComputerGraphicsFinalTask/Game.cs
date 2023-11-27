@@ -22,6 +22,20 @@ public class Game : GameWindow
     private readonly List<TextureUnit> _animeGirlTextureUnits = new();
     private static readonly List<GameObject> AnimeGirlObjects = new();
     private readonly List<int> _animeGirlTextureList = new();
+    
+    //Billboard Tree Variables
+    private Shader _billboardTreeShader;
+    public static Texture _billboardTreeTexture;
+    public static readonly List<GameObject> BillboardTreeObjects = new();
+    
+    //Flipbook Variables
+    private Shader _flipbookShader;
+    public static Texture _flipbookTexture;
+    public static readonly List<GameObject> FlipbookObjects = new();
+    
+    //Water Variables
+    private Shader _waterShader;
+    public static readonly List<GameObject> WaterObjects = new();
 
     //Skybox Variables
     private Shader _skyboxShader;
@@ -38,6 +52,8 @@ public class Game : GameWindow
 
     public static Camera GameCam = null!;
     private Vector2 _previousMousePos;
+
+    private float x;
 
     private const float CameraSpeed = 1.5f; 
     private const float CameraSensitivity = 0.2f;
@@ -76,6 +92,9 @@ public class Game : GameWindow
         _carLitShader = new Shader("litShader.vert", "litShader.frag");
         _animegirlLitShader = new Shader("litShader.vert", "litShader.frag");
         _skyboxShader = new Shader("skyboxShader.vert", "skyboxShader.frag");
+        _billboardTreeShader = new Shader("treeShader.vert", "treeShader.frag");
+        _flipbookShader = new Shader("flipbookShader.vert", "flipbookShader.frag");
+        _waterShader = new Shader("waterShader.vert", "waterShader.frag");
         
         
         //CREATE TEXTURES
@@ -90,6 +109,13 @@ public class Game : GameWindow
         _animeGirlTextures.Add(new Texture("Higo_Body.png"));
         _animeGirlTextures.Add(new Texture("Higo_Hair.png"));
         _animeGirlTextures.Add(new Texture("Higo_Fire.png"));
+        
+        //Tree Textures
+        _billboardTreeTexture = new Texture("Tree.png");
+        
+        //Flipbook Textures
+        _flipbookTexture = new Texture("flipbook.png");
+        
         
         //Skybox Texture
         
@@ -178,6 +204,46 @@ public class Game : GameWindow
             }
         //END OF ANIME GIRL MODEL STUFF
         
+        //BILLBOARD TREE STUFF
+            _billboardTreeShader.Use();
+            _billboardTreeTexture.Use(TextureUnit.Texture8);
+            id = _billboardTreeShader.GetUniformLocation("modelTex");
+            GL.Uniform1(id, 8);
+            BillboardTreeObjects.Add(new GameObject(StaticUtilities.QuadVertices, StaticUtilities.QuadIndices,
+                _billboardTreeShader));
+            //BillboardTreeObjects[BillboardTreeObjects.Count - 1].Transform.Scale = new Vector3(100f, 100f, 100f);
+            BillboardTreeObjects[BillboardTreeObjects.Count - 1].Transform.Position = new Vector3(0, 0, 1);
+        //END OF BILLBOARD TREE STUFF
+        
+        //FLIPBOOK TREE STUFF
+            _flipbookShader.Use();
+            _flipbookTexture.Use(TextureUnit.Texture9);
+            id = _flipbookShader.GetUniformLocation("modelTex");
+            GL.Uniform1(id, 9);
+            FlipbookObjects.Add(new GameObject(StaticUtilities.QuadVertices, StaticUtilities.QuadIndices,
+                _flipbookShader));
+            //BillboardTreeObjects[BillboardTreeObjects.Count - 1].Transform.Scale = new Vector3(100f, 100f, 100f);
+            FlipbookObjects[FlipbookObjects.Count - 1].Transform.Position = new Vector3(2, 0, 0);
+        //END OF FLIPBOOK TREE STUFF
+        
+        //WATER STUFF
+            _waterShader.Use();
+            importer = new AssimpContext();
+            postProcessSteps = PostProcessSteps.Triangulate | PostProcessSteps.CalculateTangentSpace;
+            scene = importer.ImportFile(StaticUtilities.ObjectDirectory + "water.fbx", postProcessSteps);
+            foreach (Mesh mesh in scene.Meshes)
+            {
+                WaterObjects.Add(new GameObject(mesh.ConvertMesh(), mesh.GetUnsignedIndices(), _waterShader));
+                Console.WriteLine("Loaded " + mesh.Name);
+            }
+            foreach(GameObject modelParts in WaterObjects)
+            {
+                modelParts.Transform.Scale = new Vector3(100f, 100f, 1f);
+                modelParts.Transform.Position = new Vector3(0, -5f, 0);
+                modelParts.Transform.Rotation = new Vector3(-MathHelper.PiOver2, 0, 0);
+                LitObjects.Add(modelParts);
+            }
+        
         //SKYBOX STUFF
             _skyboxShader.Use();
             _skyboxCubemap.Use(TextureUnit.Texture7);
@@ -187,10 +253,10 @@ public class Game : GameWindow
         //END OF SKYBOX STUFF
             
         //Lights
-        Lights.Add(new PointLight(new Vector3(1,0,0), .25f));
-        Lights[0].Transform.Position = new Vector3(2, 2, 2);
-        Lights.Add(new PointLight(new Vector3(1,1,1), 5f));
-        Lights[1].Transform.Position = new Vector3(1, -6f, 3f);
+        Lights.Add(new PointLight(new Vector3(1,0,0), .1f));
+        Lights[0].Transform.Position = new Vector3(0, 1f, 1f);
+        Lights.Add(new PointLight(new Vector3(1,1,1), 1f));
+        Lights[1].Transform.Position = new Vector3(0, -1f, 0);
 
     }
         
@@ -211,6 +277,18 @@ public class Game : GameWindow
         {
             gameObject.Dispose();
         }
+        foreach(GameObject gameObject in BillboardTreeObjects)
+        {
+            gameObject.Dispose();
+        }
+        foreach(GameObject gameObject in FlipbookObjects)
+        {
+            gameObject.Dispose();
+        }
+        foreach(GameObject gameObject in WaterObjects)
+        {
+            gameObject.Dispose();
+        }
         foreach(Skybox skybox in Skyboxes)
         {
             skybox.Dispose();
@@ -224,7 +302,10 @@ public class Game : GameWindow
             
         _carLitShader.Dispose();   
         _animegirlLitShader.Dispose();
+        _billboardTreeShader.Dispose();
+        _flipbookShader.Dispose();
         _skyboxShader.Dispose();
+        _waterShader.Dispose();
             
             
         base.OnUnload();
@@ -242,6 +323,8 @@ public class Game : GameWindow
         GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
             
+        x += (float)e.Time;
+        
         View = GameCam.GetViewMatrix();
         Projection = GameCam.GetProjectionMatrix();
             
@@ -303,11 +386,56 @@ public class Game : GameWindow
             
         }
         
-        GL.DepthMask(false);
-        _skyboxShader.Use();
+        GL.DepthFunc(DepthFunction.Lequal);
         Skyboxes[0].Render();
-        GL.DepthMask(true);
+        GL.DepthFunc(DepthFunction.Less);
+        
+        for(int j = 0; j < WaterObjects.Count; j++)
+        {
+            WaterObjects[j].MyShader.Use();
+            //_carModelTextures[j].Use(_carTextureUnits[j]);
+            //int id = CarModelObjects[j].MyShader.GetUniformLocation("modelIndex");
+            //GL.Uniform1(id, j);
+            int id = WaterObjects[j].MyShader.GetUniformLocation("time");
+            GL.Uniform1(id, x);
+            for (int i = 0; i < Lights.Count; i++)
+            {
+                PointLight currentLight = Lights[i];
+                _pointLightDefinition[1] = i.ToString();
+                string merged = string.Concat(_pointLightDefinition);
+
+                id = WaterObjects[j].MyShader.GetUniformLocation(merged + "lightColor");
+                GL.Uniform3(id, currentLight.Color);
             
+                id = WaterObjects[j].MyShader.GetUniformLocation(merged + "lightPos");
+                GL.Uniform3(id, currentLight.Transform.Position);
+        
+                id = WaterObjects[j].MyShader.GetUniformLocation(merged + "lightIntensity");
+                GL.Uniform1(id, currentLight.Intensity);
+
+            }
+                
+            id = WaterObjects[j].MyShader.GetUniformLocation("numPointLights");
+            GL.Uniform1(id, Lights.Count);
+            WaterObjects[j].Render();
+            
+        }
+        
+        for(int i = 0; i < BillboardTreeObjects.Count; i++)
+        {
+            BillboardTreeObjects[i].MyShader.Use();
+            _billboardTreeTexture.Use(TextureUnit.Texture8);
+            BillboardTreeObjects[i].Render();
+        }
+        
+        for(int i = 0; i < FlipbookObjects.Count; i++)
+        {
+            FlipbookObjects[i].MyShader.Use();
+            _flipbookTexture.Use(TextureUnit.Texture9);
+            GL.Uniform1(FlipbookObjects[i].MyShader.GetUniformLocation("time"), (float)x);
+            FlipbookObjects[i].Render();
+        }
+        
             
         SwapBuffers();
     }
