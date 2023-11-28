@@ -36,6 +36,13 @@ public class Game : GameWindow
     //Water Variables
     private Shader _waterShader;
     public static readonly List<GameObject> WaterObjects = new();
+    
+    //Terrain Variables
+    private Shader _terrainShader;
+    private Texture _waterTexture;
+    private Texture _grassTexture;
+    private Texture _stoneTexture;
+    public static readonly List<GameObject> TerrainObjects = new();
 
     //Skybox Variables
     private Shader _skyboxShader;
@@ -95,6 +102,7 @@ public class Game : GameWindow
         _billboardTreeShader = new Shader("treeShader.vert", "treeShader.frag");
         _flipbookShader = new Shader("flipbookShader.vert", "flipbookShader.frag");
         _waterShader = new Shader("waterShader.vert", "waterShader.frag");
+        _terrainShader = new Shader("terrainShader.vert", "terrainShader.frag");
         
         
         //CREATE TEXTURES
@@ -116,6 +124,10 @@ public class Game : GameWindow
         //Flipbook Textures
         _flipbookTexture = new Texture("flipbook.png");
         
+        //Terrain Textures
+        _waterTexture = new Texture("water.jpg");
+        _grassTexture = new Texture("grass.jpg");
+        _stoneTexture = new Texture("stone.jpg");
         
         //Skybox Texture
         
@@ -212,7 +224,7 @@ public class Game : GameWindow
             BillboardTreeObjects.Add(new GameObject(StaticUtilities.QuadVertices, StaticUtilities.QuadIndices,
                 _billboardTreeShader));
             //BillboardTreeObjects[BillboardTreeObjects.Count - 1].Transform.Scale = new Vector3(100f, 100f, 100f);
-            BillboardTreeObjects[BillboardTreeObjects.Count - 1].Transform.Position = new Vector3(0, 0, 1);
+            BillboardTreeObjects[BillboardTreeObjects.Count - 1].Transform.Position = new Vector3(20f, 100f, -20f);
         //END OF BILLBOARD TREE STUFF
         
         //FLIPBOOK TREE STUFF
@@ -228,6 +240,9 @@ public class Game : GameWindow
         
         //WATER STUFF
             _waterShader.Use();
+            _waterTexture.Use(TextureUnit.Texture10);
+            id = _waterShader.GetUniformLocation("modelTex");
+            GL.Uniform1(id, 10);
             importer = new AssimpContext();
             postProcessSteps = PostProcessSteps.Triangulate | PostProcessSteps.CalculateTangentSpace;
             scene = importer.ImportFile(StaticUtilities.ObjectDirectory + "water.fbx", postProcessSteps);
@@ -239,10 +254,39 @@ public class Game : GameWindow
             foreach(GameObject modelParts in WaterObjects)
             {
                 modelParts.Transform.Scale = new Vector3(100f, 100f, 1f);
-                modelParts.Transform.Position = new Vector3(0, -5f, 0);
+                modelParts.Transform.Position = new Vector3(0, 1f, 0);
                 modelParts.Transform.Rotation = new Vector3(-MathHelper.PiOver2, 0, 0);
                 LitObjects.Add(modelParts);
             }
+        //END OF WATER STUFF
+        
+        //TERRAIN STUFF
+            _terrainShader.Use();
+            _waterTexture.Use(TextureUnit.Texture10);
+            _grassTexture.Use(TextureUnit.Texture11);
+            _stoneTexture.Use(TextureUnit.Texture12);
+            id = _terrainShader.GetUniformLocation("rockTexture");
+            GL.Uniform1(id, 10);
+            id = _terrainShader.GetUniformLocation("grassTexture");
+            GL.Uniform1(id, 11);
+            id = _terrainShader.GetUniformLocation("snowTexture");
+            GL.Uniform1(id, 12);
+            importer = new AssimpContext();
+            postProcessSteps = PostProcessSteps.Triangulate | PostProcessSteps.CalculateTangentSpace;
+            scene = importer.ImportFile(StaticUtilities.ObjectDirectory + "water.fbx", postProcessSteps);
+            foreach (Mesh mesh in scene.Meshes)
+            {
+                TerrainObjects.Add(new GameObject(mesh.ConvertMesh(), mesh.GetUnsignedIndices(), _terrainShader));
+                Console.WriteLine("Loaded " + mesh.Name);
+            }
+            foreach(GameObject modelParts in TerrainObjects)
+            {
+                modelParts.Transform.Scale = new Vector3(100f, 100f, 1f);
+                modelParts.Transform.Position = new Vector3(0, 0f, 0);
+                modelParts.Transform.Rotation = new Vector3(-MathHelper.PiOver2, 0, 0);
+                LitObjects.Add(modelParts);
+            }
+        //END OF TERRAIN STUFF
         
         //SKYBOX STUFF
             _skyboxShader.Use();
@@ -254,9 +298,9 @@ public class Game : GameWindow
             
         //Lights
         Lights.Add(new PointLight(new Vector3(1,0,0), .1f));
-        Lights[0].Transform.Position = new Vector3(0, 1f, 1f);
-        Lights.Add(new PointLight(new Vector3(1,1,1), 1f));
-        Lights[1].Transform.Position = new Vector3(0, -1f, 0);
+        Lights[0].Transform.Position = new Vector3(0, 0f, 1f);
+        Lights.Add(new PointLight(new Vector3(0.9922f,0.9843f,0.8275f), 1f));
+        Lights[1].Transform.Position = new Vector3(0, 50f, 0);
 
     }
         
@@ -289,6 +333,10 @@ public class Game : GameWindow
         {
             gameObject.Dispose();
         }
+        foreach(GameObject gameObject in TerrainObjects)
+        {
+            gameObject.Dispose();
+        }
         foreach(Skybox skybox in Skyboxes)
         {
             skybox.Dispose();
@@ -306,6 +354,7 @@ public class Game : GameWindow
         _flipbookShader.Dispose();
         _skyboxShader.Dispose();
         _waterShader.Dispose();
+        _terrainShader.Dispose();
             
             
         base.OnUnload();
@@ -386,6 +435,36 @@ public class Game : GameWindow
             
         }
         
+        for(int j = 0; j < TerrainObjects.Count; j++)
+        {
+            TerrainObjects[j].MyShader.Use();
+            _waterTexture.Use(TextureUnit.Texture10);
+            _grassTexture.Use(TextureUnit.Texture11);
+            _stoneTexture.Use(TextureUnit.Texture12);
+            int id;
+            for (int i = 0; i < Lights.Count; i++)
+            {
+                PointLight currentLight = Lights[i];
+                _pointLightDefinition[1] = i.ToString();
+                string merged = string.Concat(_pointLightDefinition);
+
+                id = TerrainObjects[j].MyShader.GetUniformLocation(merged + "lightColor");
+                GL.Uniform3(id, currentLight.Color);
+            
+                id = TerrainObjects[j].MyShader.GetUniformLocation(merged + "lightPos");
+                GL.Uniform3(id, currentLight.Transform.Position);
+        
+                id = TerrainObjects[j].MyShader.GetUniformLocation(merged + "lightIntensity");
+                GL.Uniform1(id, currentLight.Intensity);
+
+            }
+                
+            id = TerrainObjects[j].MyShader.GetUniformLocation("numPointLights");
+            GL.Uniform1(id, Lights.Count);
+            TerrainObjects[j].Render();
+            
+        }
+        
         GL.DepthFunc(DepthFunction.Lequal);
         Skyboxes[0].Render();
         GL.DepthFunc(DepthFunction.Less);
@@ -393,9 +472,7 @@ public class Game : GameWindow
         for(int j = 0; j < WaterObjects.Count; j++)
         {
             WaterObjects[j].MyShader.Use();
-            //_carModelTextures[j].Use(_carTextureUnits[j]);
-            //int id = CarModelObjects[j].MyShader.GetUniformLocation("modelIndex");
-            //GL.Uniform1(id, j);
+            _waterTexture.Use(TextureUnit.Texture10);
             int id = WaterObjects[j].MyShader.GetUniformLocation("time");
             GL.Uniform1(id, x);
             for (int i = 0; i < Lights.Count; i++)

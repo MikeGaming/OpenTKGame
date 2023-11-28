@@ -10,6 +10,8 @@ out vec3 FragPos;
 out vec2 UV0;
 out vec3 Normals;
 
+out float waveHeight;
+
 // Uniforms
 uniform mat4 projection;
 uniform mat4 view;
@@ -51,11 +53,12 @@ void main()
 {
     vec3 position = vertexPosition;
 
-    float wave1 = sin(position.x * 5.0 + time * 2.0) * 5;   // Increased amplitude from 0.05 to 0.1
-    float wave2 = sin(position.y * 5.0 + time * 1.5) * 2;   // Increased amplitude from 0.1 to 0.2
-    float wave3 = sin((position.x + position.y) * 10.0 + time * 1.0) * .6;  // Increased amplitude from 0.03 to 0.06
+    float wave1 = sin(position.x * 10 + time * 2.0) * 0.05;   // Increased amplitude from 0.05 to 0.1
+    float wave2 = sin(position.y * 20 + time * 1.5) * 0.1;   // Increased amplitude from 0.1 to 0.2
+    float wave3 = sin((position.x + position.y) * 50.0 + time * 1.0) * 0.1;  // Increased amplitude from 0.03 to 0.06
 
     position.z = wave1 + wave2 + wave3;
+    waveHeight = position.z;
     // Calculate final vertex position
     
     vec4 pos = vec4(position, 1.0) * model;
@@ -65,8 +68,8 @@ void main()
     //FragPos = position; // Pass the position to the fragment shader
     gl_Position = finalPosition; // Set final position
     
-    UV0 = UVs;
+    UV0 = UVs * 20;
 
-    Normals = vertexNormals;
+    Normals = vertexNormals  * mat3(transpose(inverse(model)));
     FragPos = vec3(pos);
 }

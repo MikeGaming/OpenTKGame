@@ -1,6 +1,15 @@
 ﻿#version 440 core
 
+in float vHeight;
+in vec2 UV0;
+in vec3 Normals;
+in vec3 FragPos;
+
 out vec4 fragColor;
+
+uniform sampler2D grassTexture;
+uniform sampler2D rockTexture;
+uniform sampler2D snowTexture;
 
 struct PointLight
 {
@@ -14,12 +23,6 @@ uniform PointLight pointLights[10];
 uniform int numPointLights;
 
 uniform vec3 viewPos;
-
-in vec2 UV0;
-in vec3 FragPos;
-in vec3 Normals;
-
-uniform sampler2D modelTex;
 
 vec4 colorTex;
 
@@ -56,11 +59,26 @@ vec3 HandleLighting()
     return outCol;
 }
 
-void main(void)
+void main()
 {
-    colorTex = texture(modelTex, UV0);
+    colorTex = vec4(1.0f, 1.0f, 1.0f, 1.0f);
     
-    colorTex *= vec4(0.7, 0.7, 0.7, 1.0);
-    
+    vec4 grassColor = texture(rockTexture, UV0);
+    vec4 rockColor = texture(grassTexture, UV0);
+    vec4 snowColor = texture(snowTexture, UV0);
+
+    // Define thresholds for terrain types based on vHeight
+    float grassThreshold = 0.2;
+    float rockThreshold = 0.5;
+
+    // Apply textures based on vHeight
+    if (vHeight < grassThreshold) {
+        colorTex = mix(grassColor, rockColor, smoothstep(0.0, grassThreshold, vHeight));
+    } else if (vHeight < rockThreshold) {
+        colorTex = mix(rockColor, snowColor, smoothstep(grassThreshold, rockThreshold, vHeight));
+    } else {
+        colorTex = snowColor;
+    }
+
     fragColor = vec4(colorTex.rgb * HandleLighting(), colorTex.a);
 }
