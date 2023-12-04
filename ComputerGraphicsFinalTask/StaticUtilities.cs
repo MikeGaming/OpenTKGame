@@ -190,4 +190,13 @@ public static class StaticUtilities
         20, 21, 22,
         22, 23, 20
     };
+    
+    //Screen vertices, and UVs
+    public static readonly float[] screenSpaceVerts =
+    {
+        -1, -1, 0, 0,
+        1, -1, 1, 0,
+        1, 1, 1, 1,
+        -1, 1, 0, 1
+    };
 }

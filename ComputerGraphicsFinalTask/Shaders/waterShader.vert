@@ -49,6 +49,7 @@ vec3 Gerstner(vec2 direction, vec3 position, float amplitude, float frequency, f
 }
 
 
+
 void main()
 {
     vec3 position = vertexPosition;
