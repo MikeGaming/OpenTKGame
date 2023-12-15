@@ -1,4 +1,5 @@
-﻿using OpenTK.Graphics.OpenGL4;
+﻿using System.Diagnostics.CodeAnalysis;
+using OpenTK.Graphics.OpenGL4;
 using Assimp;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
@@ -50,15 +51,10 @@ public class Game : GameWindow
     public static Cubemap _skyboxCubemap;
     public static readonly List<Skybox> Skyboxes = new();
     
-    //Screenspace Rain Variables
-    private Shader _rainShader;
-    public static Texture _rainTexture0;
-    public static Texture _rainTexture1;
-    private static readonly List<GameObject> RainObjects = new();
     
     //Screenspace Variables
-    private Shader _bloomShader;
-    private Shader _colortintShader;
+    private Shader _postProcessShader;
+    private Shader _colorCorrectShader;
     private Shader _filmgrainShader;
     private Shader _vignetteShader;
     private Shader _pixelShader;
@@ -68,6 +64,7 @@ public class Game : GameWindow
     private Shader _chromaticShader;
     private Shader _gausShader;
     private Shader _testingShader;
+    private Shader _rainShader;
     private static readonly List<ScreenSpaceObject> ScreenSpaceObjects = new();
     
     //Gameobject variables
@@ -81,7 +78,7 @@ public class Game : GameWindow
     public static Camera GameCam = null!;
     private Vector2 _previousMousePos;
 
-    private float x;
+    private float x; //time
 
     private int _width, _height;
 
@@ -104,6 +101,7 @@ public class Game : GameWindow
         _height = height;
     }
     
+    [SuppressMessage("ReSharper.DPA", "DPA0000: DPA issues")]
     protected override void OnLoad()
     {
         base.OnLoad();
@@ -121,15 +119,15 @@ public class Game : GameWindow
 
         //CREATE SHADERS
         _carLitShader = new Shader("litShader.vert", "litShader.frag");
-        _animegirlLitShader = new Shader("litShader.vert", "litShader.frag");
+        _animegirlLitShader = new Shader("goochShader.vert", "goochShader.frag");
         _skyboxShader = new Shader("skyboxShader.vert", "skyboxShader.frag");
         _billboardTreeShader = new Shader("treeShader.vert", "treeShader.frag");
         _flipbookShader = new Shader("flipbookShader.vert", "flipbookShader.frag");
         _waterShader = new Shader("waterShader.vert", "waterShader.frag");
         _terrainShader = new Shader("terrainShader.vert", "terrainShader.frag");
-        _rainShader = new Shader("rainShader.vert", "rainShader.frag");
-        _bloomShader = new Shader("PostProcess/bloomShader.vert", "PostProcess/bloomShader.frag");
-        _colortintShader = new Shader("PostProcess/colortintShader.vert", "PostProcess/colortintShader.frag");
+        _rainShader = new Shader("PostProcess/rainShader.vert", "PostProcess/rainShader.frag");
+        _postProcessShader = new Shader("PostProcess/postProcess.vert", "PostProcess/postProcess.frag");
+        _colorCorrectShader = new Shader("PostProcess/colorCorrection.vert", "PostProcess/colorCorrection.frag");
         _filmgrainShader = new Shader("PostProcess/filmgrainShader.vert", "PostProcess/filmgrainShader.frag");
         _vignetteShader = new Shader("PostProcess/vignetteShader.vert", "PostProcess/vignetteShader.frag");
         _pixelShader = new Shader("PostProcess/pixelShader.vert", "PostProcess/pixelShader.frag");
@@ -177,9 +175,6 @@ public class Game : GameWindow
         };
         _skyboxCubemap = new Cubemap(faces);
         
-        //Screenspace Rain Textures
-        _rainTexture0 = new Texture("blank.png");
-        _rainTexture1 = new Texture("rain1.png");
         
         //LOAD OBJECTS
         
@@ -265,16 +260,15 @@ public class Game : GameWindow
             BillboardTreeObjects[BillboardTreeObjects.Count - 1].Transform.Position = new Vector3(6f, 2.25f, -1f);
         //END OF BILLBOARD TREE STUFF
         
-        //FLIPBOOK TREE STUFF
+        //FLIPBOOK EXPLOSION STUFF
             _flipbookShader.Use();
             _flipbookTexture.Use(TextureUnit.Texture9);
             id = _flipbookShader.GetUniformLocation("modelTex");
             GL.Uniform1(id, 9);
             FlipbookObjects.Add(new GameObject(StaticUtilities.QuadVertices, StaticUtilities.QuadIndices,
                 _flipbookShader));
-            //BillboardTreeObjects[BillboardTreeObjects.Count - 1].Transform.Scale = new Vector3(100f, 100f, 100f);
             FlipbookObjects[FlipbookObjects.Count - 1].Transform.Position = new Vector3(2, 2, 0);
-        //END OF FLIPBOOK TREE STUFF
+        //END OF FLIPBOOK EXPLOSION STUFF
         
         //WATER STUFF
             _waterShader.Use();
@@ -334,30 +328,24 @@ public class Game : GameWindow
             Skyboxes.Add(new Skybox(StaticUtilities.SkyboxVertices, _skyboxShader));
         //END OF SKYBOX STUFF
         
-        //RAIN STUFF
-            _rainShader.Use();
-            _rainTexture0.Use(TextureUnit.Texture13);
-            id = _rainShader.GetUniformLocation("texture0");
-            GL.Uniform1(id, 13);
-            _rainTexture1.Use(TextureUnit.Texture14);
-            id = _rainShader.GetUniformLocation("texture1");
-            GL.Uniform1(id, 14);
-            id = _rainShader.GetUniformLocation("screenSize");
-            GL.Uniform2(id, new Vector2(_width, _height));
-            RainObjects.Add(new GameObject(StaticUtilities.QuadVertices, StaticUtilities.QuadIndices,
-                _rainShader));
-        //END OF RAIN STUFF
-        
         //SCREENSPACE STUFF
-            _bloomShader.Use();
+            _postProcessShader.Use();
             ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
-                _bloomShader, _width, _height));
+                _postProcessShader, _width, _height));
+            id = _postProcessShader.GetUniformLocation("resolution");
+            GL.Uniform2(id, new Vector2(_width, _height));
             
-            _colortintShader.Use();
-            id = _colortintShader.GetUniformLocation("tintAmounts");
-            GL.Uniform3(id, new Vector3(0.7f, 0.2f, 1.2f));
+            _colorCorrectShader.Use();
+            id = _colorCorrectShader.GetUniformLocation("contrast");
+            GL.Uniform1(id, 1f);
+            id = _colorCorrectShader.GetUniformLocation("brightness");
+            GL.Uniform1(id, 0f);
+            id = _colorCorrectShader.GetUniformLocation("saturation");
+            GL.Uniform1(id, 1f);
+            id = _colorCorrectShader.GetUniformLocation("gamma");
+            GL.Uniform1(id, 1f);
             ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
-                _colortintShader, _width, _height));
+                _colorCorrectShader, _width, _height));
             
             _filmgrainShader.Use();
             id = _filmgrainShader.GetUniformLocation("grainAmount");
@@ -411,11 +399,18 @@ public class Game : GameWindow
             ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
                 _testingShader, _width, _height));
             
+            _rainShader.Use();
+            id = _rainShader.GetUniformLocation("resolution");
+            ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
+                _rainShader, _width, _height));
+            
         //Lights
-        Lights.Add(new PointLight(new Vector3(1,0,0), .1f));
-        Lights[0].Transform.Position = new Vector3(0, 0f, 1f);
-        Lights.Add(new PointLight(new Vector3(0.9922f,0.9843f,0.8275f), 1f));
-        Lights[1].Transform.Position = new Vector3(0, 50f, 0);
+        Lights.Add(new PointLight(new Vector3(1,1,1), 1f));
+        Lights[0].Transform.Position = new Vector3(5f, 10f, 1f);
+        FlipbookObjects[FlipbookObjects.Count - 1].Transform.Position = Lights[0].Transform.Position;
+        FlipbookObjects[FlipbookObjects.Count - 1].Transform.Scale = new Vector3(0.1f);
+        //Lights.Add(new PointLight(new Vector3(0.9922f,0.9843f,0.8275f), 1f));
+        //Lights[1].Transform.Position = new Vector3(0, 50f, 0);
         
     }
         
@@ -456,10 +451,6 @@ public class Game : GameWindow
         {
             skybox.Dispose();
         }
-        foreach(GameObject gameObject in RainObjects)
-        {
-            gameObject.Dispose();
-        }
         foreach(ScreenSpaceObject screenSpaceObject in ScreenSpaceObjects)
         {
             screenSpaceObject.Dispose();
@@ -479,8 +470,8 @@ public class Game : GameWindow
         _waterShader.Dispose();
         _terrainShader.Dispose();
         _rainShader.Dispose();
-        _bloomShader.Dispose();
-        _colortintShader.Dispose();
+        _postProcessShader.Dispose();
+        _colorCorrectShader.Dispose();
         _filmgrainShader.Dispose();
         _vignetteShader.Dispose();
         _pixelShader.Dispose();
@@ -503,6 +494,7 @@ public class Game : GameWindow
     }
     
     int cycle = 0;
+    private bool bloom, exposure, whiteBalance, colorCorrect;
     
     protected override void OnRenderFrame(FrameEventArgs e)
     {
@@ -557,6 +549,8 @@ public class Game : GameWindow
             _animeGirlTextures[j].Use(_animeGirlTextureUnits[j]);
             int id = AnimeGirlObjects[j].MyShader.GetUniformLocation("modelIndex");
             GL.Uniform1(id, j);
+            id = AnimeGirlObjects[j].MyShader.GetUniformLocation("resolution");
+            GL.Uniform2(id, new Vector2(_width, _height));
             for (int i = 0; i < Lights.Count; i++)
             {
                 PointLight currentLight = Lights[i];
@@ -657,31 +651,25 @@ public class Game : GameWindow
             GL.Uniform1(FlipbookObjects[i].MyShader.GetUniformLocation("time"), x);
             FlipbookObjects[i].Render();
         }
-        
-        for(int i = 0; i < RainObjects.Count; i++)
-        {
-            RainObjects[i].MyShader.Use();
-            _rainTexture0.Use(TextureUnit.Texture13);
-            //int textureLocation = RainObjects[i].MyShader.GetUniformLocation("texture0");
-            //GL.Uniform1(textureLocation, 13);
-            _rainTexture1.Use(TextureUnit.Texture14);
-            //textureLocation = RainObjects[i].MyShader.GetUniformLocation("texture1");
-            //GL.Uniform1(textureLocation, 14);
-            GL.Uniform1(RainObjects[i].MyShader.GetUniformLocation("time"), x);
-            GL.Uniform2(RainObjects[i].MyShader.GetUniformLocation("resolution"), new Vector2(_width, _height));
-            RainObjects[i].Render();
-        }
 
         if (cycle == 0)
         {
-            _bloomShader.Use();
-            int id = _bloomShader.GetUniformLocation("resolution");
+            _postProcessShader.Use();
+            int id = _postProcessShader.GetUniformLocation("resolution");
             GL.Uniform2(id, new Vector2(_width, _height));
+            id = _postProcessShader.GetUniformLocation("bloomEnabled");
+            GL.Uniform1(id, bloom ? 1 : 0);
+            id = _postProcessShader.GetUniformLocation("exposureEnabled");
+            GL.Uniform1(id, exposure ? 1 : 0);
+            id = _postProcessShader.GetUniformLocation("whiteBalanceEnabled");
+            GL.Uniform1(id, whiteBalance ? 1 : 0);
+            id = _postProcessShader.GetUniformLocation("colorCorrectionEnabled");
+            GL.Uniform1(id, colorCorrect ? 1 : 0);
             ScreenSpaceObjects[0].Render();
         }
         if (cycle == 1)
         {
-            _colortintShader.Use();
+            _colorCorrectShader.Use();
             ScreenSpaceObjects[1].Render();
         }
         if (cycle == 2)
@@ -743,15 +731,27 @@ public class Game : GameWindow
             _testingShader.Use();
             int id = _testingShader.GetUniformLocation("resolution");
             GL.Uniform2(id, new Vector2(_width, _height));
+            id = _testingShader.GetUniformLocation("iTime");
+            GL.Uniform1(id, x);
             ScreenSpaceObjects[10].Render();
         }
-        
+
+        if (cycle == 11)
+        {
+            _rainShader.Use();
+            int id = _rainShader.GetUniformLocation("resolution");
+            GL.Uniform2(id, new Vector2(_width, _height));
+            id = _rainShader.GetUniformLocation("time");
+            GL.Uniform1(id, x);
+            ScreenSpaceObjects[11].Render();
+        }
         
         SwapBuffers();
     }
 
     
     float cooldown = 0;
+    private float tempCamSpeed;
     
     protected override void OnUpdateFrame(FrameEventArgs e)
     {
@@ -763,7 +763,7 @@ public class Game : GameWindow
         }
         cooldown += (float)e.Time;
         
-        if(KeyboardState.IsKeyDown(Keys.Tab) && cooldown > .5f)
+        if(KeyboardState.IsKeyDown(Keys.Tab) && cooldown > .2f)
         {
             cycle++;
             if (cycle > ScreenSpaceObjects.Count - 1)
@@ -773,35 +773,67 @@ public class Game : GameWindow
             cooldown = 0;
         }
 
+        if (KeyboardState.IsKeyDown(Keys.D0) && cooldown > .5f)
+        {
+            bloom = !bloom;
+            cooldown = 0;
+        }
+        if (KeyboardState.IsKeyDown(Keys.D1)&& cooldown > .5f)
+        {
+            exposure = !exposure;
+            cooldown = 0;
+        }
+        if (KeyboardState.IsKeyDown(Keys.D2)&& cooldown > .5f)
+        {
+            whiteBalance = !whiteBalance;
+            cooldown = 0;
+        }
+        if (KeyboardState.IsKeyDown(Keys.D3)&& cooldown > .5f)
+        {
+            colorCorrect = !colorCorrect;
+            cooldown = 0;
+        }
+        
+        
+        if (KeyboardState.IsKeyDown(Keys.LeftShift))
+        {
+            tempCamSpeed = CameraSpeed * 2.0f;
+        }
+        else
+        {
+            tempCamSpeed = CameraSpeed;
+        }
+        
         if (KeyboardState.IsKeyDown(Keys.W))
         {
-            GameCam.Position += GameCam.Forward * CameraSpeed * (float)e.Time; // Forward
+            GameCam.Position += GameCam.Forward * tempCamSpeed * (float)e.Time; // Forward
         }
 
         if (KeyboardState.IsKeyDown(Keys.S))
         {
-            GameCam.Position -= GameCam.Forward * CameraSpeed * (float)e.Time; // Backwards
+            GameCam.Position -= GameCam.Forward * tempCamSpeed * (float)e.Time; // Backwards
         }
 
         if (KeyboardState.IsKeyDown(Keys.A))
         {
-            GameCam.Position -= GameCam.Right * CameraSpeed * (float)e.Time; // Left
+            GameCam.Position -= GameCam.Right * tempCamSpeed * (float)e.Time; // Left
         }
 
         if (KeyboardState.IsKeyDown(Keys.D))
         {
-            GameCam.Position += GameCam.Right * CameraSpeed * (float)e.Time; // Right
+            GameCam.Position += GameCam.Right * tempCamSpeed * (float)e.Time; // Right
         }
 
         if (KeyboardState.IsKeyDown(Keys.Space))
         {
-            GameCam.Position += GameCam.Up * CameraSpeed * (float)e.Time; // Up
+            GameCam.Position += GameCam.Up * tempCamSpeed * (float)e.Time; // Up
         }
 
-        if (KeyboardState.IsKeyDown(Keys.LeftShift))
+        if (KeyboardState.IsKeyDown(Keys.LeftControl))
         {
-            GameCam.Position -= GameCam.Up * CameraSpeed * (float)e.Time; // Down
+            GameCam.Position -= GameCam.Up * tempCamSpeed * (float)e.Time; // Down
         }
+        
 
         // Get the mouse state
 

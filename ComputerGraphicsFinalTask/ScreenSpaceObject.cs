@@ -65,7 +65,7 @@ public class ScreenSpaceObject
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, _frameBufferObject);
         
         GL.GenTextures(1, out texture);
-        GL.ActiveTexture(TextureUnit.Texture15);
+        GL.ActiveTexture(TextureUnit.Texture31);
         GL.BindTexture(TextureTarget.Texture2D, texture);
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgb, Width, Height, 0, PixelFormat.Rgb, PixelType.UnsignedByte, IntPtr.Zero);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear); 
@@ -101,9 +101,9 @@ public class ScreenSpaceObject
         
         GL.BindVertexArray(_vertexArrayObject);
         GL.Disable(EnableCap.DepthTest);
-        GL.ActiveTexture(TextureUnit.Texture15);
+        GL.ActiveTexture(TextureUnit.Texture31);
         GL.BindTexture(TextureTarget.Texture2D, texture);
-        GL.Uniform1(MyShader.GetUniformLocation("screenTexture"), 15);
+        GL.Uniform1(MyShader.GetUniformLocation("screenTexture"), 31);
         GL.DrawElements(PrimitiveType.Triangles, Indices.Length, DrawElementsType.UnsignedInt, 0);
         
         GL.BindVertexArray(0);
@@ -124,6 +124,7 @@ public class ScreenSpaceObject
         GL.DeleteBuffer(_vertexBufferObject);
         GL.DeleteVertexArray(_vertexArrayObject);
         GL.DeleteFramebuffer(_frameBufferObject);
+        GL.DeleteRenderbuffer(_renderBufferObject);
     }
 
 
