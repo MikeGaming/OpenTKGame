@@ -27,9 +27,9 @@ public class PointLight
 
     public void Update()
     {
-        foreach (GameObject litObjects in Game.LitObjects)
+        foreach (Transform litObjects in Game.LitObjects)
         {
-            float distance = Vector3.Distance(litObjects.Transform.Position, Transform.Position);
+            float distance = Vector3.Distance(litObjects.Position, Transform.Position);
             
             //X = distance
             double brightnessFactor = Math.Pow(distance, -2) * _intensitySqr;

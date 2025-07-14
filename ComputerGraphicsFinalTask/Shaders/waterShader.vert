@@ -1,9 +1,9 @@
 ﻿#version 330 core
 
 // Input vertex attributes
-layout(location = 0) in vec3 vertexPosition;
-layout(location = 1) in vec3 vertexNormals;
-layout(location = 2) in vec2 UVs;
+in vec3 vertexPosition;
+in vec3 vertexNormals;
+in vec2 UVs;
 
 // Output vertex attributes
 out vec3 FragPos;
@@ -69,8 +69,8 @@ void main()
     //FragPos = position; // Pass the position to the fragment shader
     gl_Position = finalPosition; // Set final position
     
-    UV0 = UVs * 20;
 
     Normals = vertexNormals  * mat3(transpose(inverse(model)));
+    UV0 = UVs * 10;
     FragPos = vec3(pos);
 }

@@ -1,8 +1,8 @@
-﻿using OpenTK.Graphics.OpenGL4;
+using OpenTK.Graphics.OpenGL4;
 
 namespace ComputerGraphicsFinalTask;
 
-public class GameObject
+public class TerrainObject
 {
     public Transform Transform; // Every gameobject has a transform
 
@@ -13,7 +13,7 @@ public class GameObject
     private readonly uint[] Indices;
     public readonly Shader MyShader;
 
-    public GameObject(float[] vertices, uint[] indices, Shader shader)
+    public TerrainObject(float[] vertices, uint[] indices, Shader shader)
     {
         
         Transform = new Transform();
@@ -36,16 +36,20 @@ public class GameObject
         GL.BindVertexArray(_vertexArrayObject);
 
         int id = MyShader.GetAttribLocation("vertexPosition");
-        GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 0);
-        GL.EnableVertexAttribArray(id);
+        if (id != -1) GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 0);
+        if (id != -1) GL.EnableVertexAttribArray(id);
         
         id = MyShader.GetAttribLocation("vertexNormals");
-        GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 3 * sizeof(float));
-        GL.EnableVertexAttribArray(id);
+        if (id != -1) GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 3 * sizeof(float));
+        if (id != -1) GL.EnableVertexAttribArray(id);
             
         id = MyShader.GetAttribLocation("UVs");
-        GL.VertexAttribPointer(id, 2, VertexAttribPointerType.Float, false, 8 * sizeof(float), 6 * sizeof(float));
-        GL.EnableVertexAttribArray(id);
+        if (id != -1) GL.VertexAttribPointer(id, 2, VertexAttribPointerType.Float, false, 8 * sizeof(float), 6 * sizeof(float));
+        if (id != -1) GL.EnableVertexAttribArray(id);
+
+        // id = MyShader.GetAttribLocation("a_Color");
+        // if (id != -1) GL.VertexAttribPointer(id, 4, VertexAttribPointerType.Float, false, 8 * sizeof(float), 4 * sizeof(float));
+        // if (id != -1) GL.EnableVertexAttribArray(id);
             
         //EBO
 
@@ -67,7 +71,7 @@ public class GameObject
         
      
         id = MyShader.GetUniformLocation("viewPos");
-        GL.Uniform3(id, Game.GameCam.Position);
+        if (id != -1) GL.Uniform3(id, Game.GameCam.Position);
         
         StaticUtilities.CheckError("render");
         
