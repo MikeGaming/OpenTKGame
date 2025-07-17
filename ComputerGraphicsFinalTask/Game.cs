@@ -72,6 +72,7 @@ public class Game : GameWindow
     public static readonly List<Transform> LitObjects = new();
     //private static readonly List<GameObject> UnlitObjects = new();
     private static readonly List<PointLight> Lights = new();
+    public static DirectionalLight directionalLight = null!; // Initialized in OnLoad
         
     public static Matrix4 View;
     public static Matrix4 Projection;
@@ -178,12 +179,18 @@ public class Game : GameWindow
             "back.jpg"
         };
         _skyboxCubemap = new Cubemap(faces);
-        
-        
+
+
         //LOAD OBJECTS
         
+        //Lights
+        Lights.Add(new PointLight(new Vector3(1,1,1), 1f));
+        Lights[0].Transform.Position = new Vector3(5f, 10f, 1f);
+        directionalLight = new DirectionalLight(new Vector3(1f,0f,0f), 100f);
+        directionalLight.Transform.Rotation = new Vector3(-MathHelper.PiOver2, 0, 0); // Pointing downwards
+        
         //CAR MODEL STUFF
-            _carLitShader.Use();
+        _carLitShader.Use();
             
             //Car Texture Loading
             _carTextureUnits.Add(TextureUnit.Texture0);
@@ -334,9 +341,9 @@ public class Game : GameWindow
                     terrainVertices[index] = x - half_length;
                     terrainVertices[index + 1] = 0.0f; // Height will be set later
                     terrainVertices[index + 2] = z - half_length;
-                    terrainVertices[index + 3] = 0.0f; // Normals will be set later
-                    terrainVertices[index + 4] = 0.0f; // Normals will be set later
-                    terrainVertices[index + 5] = 0.0f; // Normals will be set later
+                    terrainVertices[index + 3] = 0.0f; // Normal X component
+                    terrainVertices[index + 4] = 1.0f; // Normal Y component
+                    terrainVertices[index + 5] = 0.0f; // Normal Z component
                     terrainVertices[index + 6] = (float)x / (side_length - 1); // UVs
                     terrainVertices[index + 7] = (float)z / (side_length - 1); // UVs
                 }
@@ -364,22 +371,22 @@ public class Game : GameWindow
             float gradientRotation = 0f;
             //Random float between -180 and 180
             float noiseRotation = 30f;
-            //Random float between 0 and 100
+            //Random float between 10 and 100
             float terrainHeight = 50f;
             Vector2 angularVariance = Vector2.One * 2f;
             //Random float between 0.1 and 400
             float scale = 100f;
             //Random int between 1 and 32
-            float octaves = 10;
+            float octaves = 20;
             //Random float between 0.01 and 1
             float amplitudeDecay = 0.45f;
             Vector3 offset = new Vector3(0.0f, terrainHeight, 0.0f);
             //Random int between 0 and 10000
             float seed = Random.Shared.Next(0, 10000);
             //Random float between 0.01 and 2
-            float initialAmplitude = 0.5f;
+            float initialAmplitude = 0.7f;
             //Random float between 0.01 and 3
-            float lacunarity = 2.0f;
+            float lacunarity = 2.5f;
             Vector2 slopeRange = new Vector2(0.5f, 0.98f);
             float frequencyVarianceLowerBound = 0.0f;
             float frequencyVarianceUpperBound = 0.0f;
@@ -422,39 +429,6 @@ public class Game : GameWindow
             id = _terrainShader.GetUniformLocation("_RockThreshold");
             if (id != -1) GL.Uniform1(id, rockThreshold);
             
-            int uniformBlockIndex = GL.GetUniformBlockIndex(_terrainShader.Handle, "UniformBufferObject");
-
-            GL.UniformBlockBinding(_terrainShader.Handle, uniformBlockIndex, 0);
-
-            int blockSize;
-            GL.GetActiveUniformBlock(
-                _terrainShader.Handle,
-                uniformBlockIndex,
-                ActiveUniformBlockParameter.UniformBlockDataSize,
-                out blockSize);
-
-            byte[] blockBuffer = new byte[blockSize];
-
-            int[] indices = new int[19];
-
-            GL.GetActiveUniformBlock(
-                _terrainShader.Handle,
-                uniformBlockIndex,
-                ActiveUniformBlockParameter.UniformBlockActiveUniformIndices,
-                indices);
-
-            int[] offsets = new int[indices.Length];
-            GL.GetActiveUniforms(
-                _terrainShader.Handle,
-                indices.Length,
-                indices,
-                ActiveUniformParameter.UniformOffset,
-                offsets);
-
-            int uboHandle = GL.GenBuffer();
-        GL.BindBuffer(BufferTarget.UniformBuffer, uboHandle);
-        GL.BufferData(BufferTarget.UniformBuffer, blockSize, blockBuffer, BufferUsageHint.DynamicDraw);
-        GL.BindBufferBase(BufferRangeTarget.UniformBuffer, 0, uboHandle);
         //END OF TERRAIN STUFF
         
         //SKYBOX STUFF
@@ -540,14 +514,9 @@ public class Game : GameWindow
             id = _rainShader.GetUniformLocation("resolution");
             ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
                 _rainShader, _width, _height));
-            
-        //Lights
-        Lights.Add(new PointLight(new Vector3(1,1,1), 1f));
-        Lights[0].Transform.Position = new Vector3(5f, 10f, 1f);
+
         FlipbookObjects[FlipbookObjects.Count - 1].Transform.Position = Lights[0].Transform.Position;
         FlipbookObjects[FlipbookObjects.Count - 1].Transform.Scale = new Vector3(0.1f);
-        //Lights.Add(new PointLight(new Vector3(0.9922f,0.9843f,0.8275f), 1f));
-        //Lights[1].Transform.Position = new Vector3(0, 50f, 0);
         
     }
         
@@ -736,7 +705,13 @@ public class Game : GameWindow
             }
                 
             id = TerrainObjects[j].MyShader.GetUniformLocation("numPointLights");
-            if (id != -1) GL.Uniform1(id, Lights.Count > 0 ? Lights.Count : 0);
+            if (id != -1) GL.Uniform1(id, Lights.Count);
+            id = _terrainShader.GetUniformLocation("directionalLightColor");
+            if (id != -1) GL.Uniform3(id, directionalLight.Color);
+            id = _terrainShader.GetUniformLocation("directionalLightDir");
+            if (id != -1) GL.Uniform3(id, directionalLight.Transform.Forward);
+            id = _terrainShader.GetUniformLocation("directionalLightIntensity");
+            if (id != -1) GL.Uniform1(id, directionalLight.Intensity);
             TerrainObjects[j].Render();
             
         }

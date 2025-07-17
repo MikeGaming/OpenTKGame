@@ -196,6 +196,6 @@ void main() {
 
 
     Normals = vertexNormals  * mat3(transpose(inverse(model)));
-    UV0 = UVs * 100;
+    UV0 = UVs * _Scale;
     pos = vec3(newPos);
 }

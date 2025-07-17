@@ -46,6 +46,11 @@ struct PointLight
 
 };
 
+
+uniform vec3 _directionalLightColor;
+uniform vec3 _directionalLightDir;
+uniform float _directionalLightIntensity;
+
 uniform sampler2D waterTexture;
 uniform sampler2D grassTexture;
 uniform sampler2D rockTexture;
@@ -83,6 +88,22 @@ vec3 HandleLighting()
 
         outCol += (ambient + diffuse + specular) * currentLight.lightIntensity;
     }
+
+	// Handle directional light
+	float ambientStrength = 0.2f; // Ambient light strength
+	vec3 ambient = ambientStrength * _directionalLightColor;
+	vec3 norms = normalize(normals); // Normalized normals
+	vec3 lightDir = normalize(_directionalLightDir); // Direction of directional light (pointing towards the light source)
+	float diff = max(dot(norms, lightDir), 0); // Diffuse light
+	vec3 diffuse = diff * _directionalLightColor * vec3(colorTex); // Diffuse light color
+	diffuse = vec3(min(diffuse.x, 1), min(diffuse.y, 1), min(diffuse.z, 1));
+	const float shininess = 128;
+	float specularStrength = 0.5f; // Specular light strength
+	vec3 viewDir = normalize(viewPos - pos); // Direction of view
+	vec3 reflectionDirection = reflect(-lightDir, norms); // Reflects the light direction off the normal
+	float spec = pow(max(dot(viewDir, reflectionDirection), 0), shininess); // Specular light
+	vec3 specular = specularStrength * spec * _directionalLightColor; // Specular light color
+	outCol += (ambient + diffuse + specular) * _directionalLightIntensity;
 
     return outCol;
 }
@@ -233,7 +254,7 @@ void main()
     // Use the slope of the above normal to create the blend value between the two terrain colors
     float material_blend_factor = smoothstep(_SlopeRange.x, _SlopeRange.y, 1 - slope_normal.y);
 
-    /
+    
     
     vec4 waterColor = texture(waterTexture, UV0);
     vec4 grassColor = texture(grassTexture, UV0);
@@ -256,7 +277,8 @@ void main()
 
     colorTex = baseColor;
 
-    normals = Normals;
+	normals = Normals;
 
+    //fragColor = vec4(normalize(normals), 1.0);
     fragColor = vec4(colorTex.rgb * HandleLighting(), colorTex.a); 
 }

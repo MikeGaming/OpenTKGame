@@ -8,8 +8,13 @@ public class Transform
     private Vector3 _position;
     private Vector3 _rotation;
     private Vector3 _scale = Vector3.One;
+
+    // forward vector
+    public Vector3 Forward => Vector3.TransformNormal(Vector3.UnitZ, Matrix4.CreateRotationX(_rotation.X) * Matrix4.CreateRotationY(_rotation.Y) * Matrix4.CreateRotationZ(_rotation.Z));
     
-    public Vector3 Position {
+    
+    public Vector3 Position
+    {
         get => _position;
         set
         {
@@ -36,6 +41,8 @@ public class Transform
             UpdateMatrix();
         }
     }
+
+
 
     public Matrix4 GetMatrix = Matrix4.Identity;
 
