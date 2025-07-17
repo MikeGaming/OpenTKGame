@@ -45,6 +45,7 @@ public class Game : GameWindow
     private Texture _grassTexture;
     private Texture _stoneTexture;
     public static readonly List<TerrainObject> TerrainObjects = new();
+    int side_length = 1000;
 
     //Skybox Variables
     private Shader _skyboxShader;
@@ -115,7 +116,7 @@ public class Game : GameWindow
         _previousMousePos = new Vector2(MouseState.X, MouseState.Y);
         CursorState = CursorState.Grabbed;
             
-        GameCam = new Camera(Vector3.UnitZ * 3, (float)_width / _height);
+        GameCam = new Camera(Vector3.Zero, (float)_width / _height);
 
         //CREATE SHADERS
         _carLitShader = new Shader("litShader.vert", "litShader.frag");
@@ -300,54 +301,91 @@ public class Game : GameWindow
             _waterTexture.Use(TextureUnit.Texture10);
             _grassTexture.Use(TextureUnit.Texture11);
             _stoneTexture.Use(TextureUnit.Texture12);
-            id = _terrainShader.GetUniformLocation("rockTexture");
+            id = _terrainShader.GetUniformLocation("waterTexture");
             if (id != -1) GL.Uniform1(id, 10);
             id = _terrainShader.GetUniformLocation("grassTexture");
             if (id != -1) GL.Uniform1(id, 11);
-            id = _terrainShader.GetUniformLocation("snowTexture");
+            id = _terrainShader.GetUniformLocation("rockTexture");
             if (id != -1) GL.Uniform1(id, 12);
-            importer = new AssimpContext();
-            postProcessSteps = PostProcessSteps.Triangulate | PostProcessSteps.CalculateTangentSpace;
-            scene = importer.ImportFile(StaticUtilities.ObjectDirectory + "water.fbx", postProcessSteps);
-            foreach (Mesh mesh in scene.Meshes)
+            // importer = new AssimpContext();
+            // postProcessSteps = PostProcessSteps.Triangulate | PostProcessSteps.CalculateTangentSpace;
+            // scene = importer.ImportFile(StaticUtilities.ObjectDirectory + "water.fbx", postProcessSteps);
+            // foreach (Mesh mesh in scene.Meshes)
+            // {
+            //     TerrainObjects.Add(new TerrainObject(mesh.ConvertMesh(), mesh.GetUnsignedIndices(), _terrainShader));
+            //     Console.WriteLine("Loaded " + mesh.Name);
+            // }
+            // foreach(TerrainObject modelParts in TerrainObjects)
+            // {
+            //     modelParts.Transform.Scale = new Vector3(1f, 1f, 1f);
+            //     modelParts.Transform.Position = new Vector3(0, 0f, 0);
+            //     modelParts.Transform.Rotation = new Vector3(0, 0, 0);
+            //     LitObjects.Add(modelParts.Transform);
+            // }
+            var half_length = (side_length - 1) / 2.0f;
+        // Generate vertices and indices for the terrain plane on the zx plane
+            float[] terrainVertices = new float[(side_length * side_length) * 8];
+            uint[] terrainIndices = new uint[(side_length - 1) * (side_length - 1) * 6];
+            for (int z = 0; z < side_length; z++)
             {
-                TerrainObjects.Add(new TerrainObject(mesh.ConvertMesh(), mesh.GetUnsignedIndices(), _terrainShader));
-                Console.WriteLine("Loaded " + mesh.Name);
+                for (int x = 0; x < side_length; x++)
+                {
+                    int index = (z * side_length + x) * 8;
+                    terrainVertices[index] = x - half_length;
+                    terrainVertices[index + 1] = 0.0f; // Height will be set later
+                    terrainVertices[index + 2] = z - half_length;
+                    terrainVertices[index + 3] = 0.0f; // Normals will be set later
+                    terrainVertices[index + 4] = 0.0f; // Normals will be set later
+                    terrainVertices[index + 5] = 0.0f; // Normals will be set later
+                    terrainVertices[index + 6] = (float)x / (side_length - 1); // UVs
+                    terrainVertices[index + 7] = (float)z / (side_length - 1); // UVs
+                }
             }
-            foreach(TerrainObject modelParts in TerrainObjects)
+            for (int z = 0; z < side_length - 1; z++)
             {
-                modelParts.Transform.Scale = new Vector3(100f, 100f, 1f);
-                modelParts.Transform.Position = new Vector3(0, 1f, 0);
-                modelParts.Transform.Rotation = new Vector3(-MathHelper.PiOver2, 0, 0);
-                LitObjects.Add(modelParts.Transform);
+                for (int x = 0; x < side_length - 1; x++)
+                {
+                    int index = (z * (side_length - 1) + x) * 6;
+                    terrainIndices[index] = (uint)(z * side_length + x);
+                    terrainIndices[index + 1] = (uint)((z + 1) * side_length + x);
+                    terrainIndices[index + 2] = (uint)(z * side_length + x + 1);
+                    terrainIndices[index + 3] = (uint)((z + 1) * side_length + x);
+                    terrainIndices[index + 4] = (uint)((z + 1) * side_length + x + 1);
+                    terrainIndices[index + 5] = (uint)(z * side_length + x + 1);
+                }
             }
+            TerrainObjects.Add(new TerrainObject(terrainVertices, terrainIndices, _terrainShader));
+            TerrainObjects[TerrainObjects.Count - 1].Transform.Scale = new Vector3(1f, 1f, 1f);
+            TerrainObjects[TerrainObjects.Count - 1].Transform.Position = new Vector3(0, 0f, 0);
+            TerrainObjects[TerrainObjects.Count - 1].Transform.Rotation = new Vector3(0, 0, 0);
+            LitObjects.Add(TerrainObjects[TerrainObjects.Count - 1].Transform);
             StaticUtilities.CheckError("After terrain object loading");
             //Random float between -180 and 180
-            float gradientRotation = Random.Shared.NextSingle() * 360f - 180f;
+            float gradientRotation = 0f;
             //Random float between -180 and 180
-            float noiseRotation = Random.Shared.NextSingle() * 360f - 180f;
-            //Random float between 0 and 300
-            float terrainHeight = Random.Shared.NextSingle() * 300f;
-            Vector2 angularVariance = Vector2.Zero;
+            float noiseRotation = 30f;
+            //Random float between 0 and 100
+            float terrainHeight = 50f;
+            Vector2 angularVariance = Vector2.One * 2f;
             //Random float between 0.1 and 400
-            float scale = Random.Shared.NextSingle() * (10 - 0.5f) + 0.5f;
+            float scale = 100f;
             //Random int between 1 and 32
-            float octaves = Random.Shared.Next(1, 32);
+            float octaves = 10;
             //Random float between 0.01 and 1
-            float amplitudeDecay = Random.Shared.NextSingle() * (1f - 0.01f) + 0.01f;
-            Vector3 offset = new Vector3(0.0f, 0.0f, terrainHeight);
+            float amplitudeDecay = 0.45f;
+            Vector3 offset = new Vector3(0.0f, terrainHeight, 0.0f);
             //Random int between 0 and 10000
             float seed = Random.Shared.Next(0, 10000);
             //Random float between 0.01 and 2
-            float initialAmplitude = Random.Shared.NextSingle() * (2f - 0.01f) + 0.01f;
+            float initialAmplitude = 0.5f;
             //Random float between 0.01 and 3
-            float lacunarity = Random.Shared.NextSingle() * (3f - 1f) + 1f;
+            float lacunarity = 2.0f;
             Vector2 slopeRange = new Vector2(0.5f, 0.98f);
             float frequencyVarianceLowerBound = 0.0f;
             float frequencyVarianceUpperBound = 0.0f;
             float slopeDamping = 0.2f;
-            float grassThreshold = 0.4f;
-            float rockThreshold = 0.6f;
+            float grassThreshold = 0.1f;
+            float rockThreshold = 0.7f;
             
             id = _terrainShader.GetUniformLocation("_GradientRotation");
             if (id != -1) GL.Uniform1(id, gradientRotation);
