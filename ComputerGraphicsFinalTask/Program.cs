@@ -2,7 +2,7 @@
 
 using ComputerGraphicsFinalTask;
 
-using (Game theGame = new Game(1280, 720, "game"))
+using (Game theGame = new Game(1024, 1024, "game"))
 {
     theGame.Run();
 }

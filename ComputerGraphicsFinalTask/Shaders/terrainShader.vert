@@ -2,6 +2,7 @@
 
 // This is the uniform buffer that contains all of the settings we sent over from the cpu in _render_callback. Must match with the one in the fragment shader.
 uniform mat4 model;
+uniform mat4 lightSpaceMatrix;
 uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 viewPos;

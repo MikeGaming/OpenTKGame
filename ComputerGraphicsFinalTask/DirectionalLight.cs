@@ -20,6 +20,7 @@ public class DirectionalLight
 
     public DirectionalLight(Vector3 col, float intensity)
     {
+        Transform = new Transform();
         Color = col;
         Intensity = intensity;
         _intensitySqr = intensity * intensity;

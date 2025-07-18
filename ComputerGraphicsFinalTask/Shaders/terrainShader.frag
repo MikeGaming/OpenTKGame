@@ -102,7 +102,7 @@ vec3 HandleLighting()
 	vec3 viewDir = normalize(viewPos - pos); // Direction of view
 	vec3 reflectionDirection = reflect(-lightDir, norms); // Reflects the light direction off the normal
 	float spec = pow(max(dot(viewDir, reflectionDirection), 0), shininess); // Specular light
-	vec3 specular = specularStrength * spec * _directionalLightColor; // Specular light color
+	vec3 specular = specularStrength * spec * vec3(1,1,1); // Specular light color
 	outCol += (ambient + diffuse + specular) * _directionalLightIntensity;
 
     return outCol;
