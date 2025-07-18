@@ -66,6 +66,7 @@ public class Game : GameWindow
     private Shader _gausShader;
     private Shader _testingShader;
     private Shader _rainShader;
+    private Shader _fogShader;
     private static readonly List<ScreenSpaceObject> ScreenSpaceObjects = new();
     
     //Gameobject variables
@@ -75,7 +76,7 @@ public class Game : GameWindow
     public static DirectionalLight directionalLight = null!; // Initialized in OnLoad
 
     private Shader _shadowShader;
-    public static ShadowMap shadowMap = null!;
+    // public static ShadowMap shadowMap = null!;
         
     public static Matrix4 View;
     public static Matrix4 Projection;
@@ -143,6 +144,7 @@ public class Game : GameWindow
         _gausShader = new Shader("PostProcess/gausShader.vert", "PostProcess/gausShader.frag");
         _testingShader = new Shader("PostProcess/testingShader.vert", "PostProcess/testingShader.frag");
         _shadowShader = new Shader("shadows.vert", "shadows.frag");
+        _fogShader = new Shader("PostProcess/fogShader.vert", "PostProcess/fogShader.frag");
         
         //CREATE TEXTURES
 
@@ -444,14 +446,13 @@ public class Game : GameWindow
             Skyboxes.Add(new Skybox(StaticUtilities.SkyboxVertices, _skyboxShader));
         //END OF SKYBOX STUFF
 
-        // Shadow Stuff
-        _shadowShader.Use();
-        shadowMap = new ShadowMap(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
-                _shadowShader, _width, _height);
-        id = _shadowShader.GetUniformLocation("resolution");
-        if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
-        
         //SCREENSPACE STUFF
+        _shadowShader.Use();
+            ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
+                _shadowShader, _width, _height));
+            id = _shadowShader.GetUniformLocation("resolution");
+            if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
+
         _postProcessShader.Use();
             ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
                 _postProcessShader, _width, _height));
@@ -527,6 +528,14 @@ public class Game : GameWindow
             ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
                 _rainShader, _width, _height));
 
+            _fogShader.Use();
+            id = _fogShader.GetUniformLocation("resolution");
+            if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
+            id = _fogShader.GetUniformLocation("fogColor");
+            if (id != -1) GL.Uniform4(id, new Vector4(0.1f, 0.1f, 0.1f, 1.0f));
+            ScreenSpaceObjects.Add(new ScreenSpaceObject(StaticUtilities.screenSpaceVerts, StaticUtilities.QuadIndices,
+                _fogShader, _width, _height));
+
         FlipbookObjects[FlipbookObjects.Count - 1].Transform.Position = Lights[0].Transform.Position;
         FlipbookObjects[FlipbookObjects.Count - 1].Transform.Scale = new Vector3(0.1f);
         
@@ -573,7 +582,7 @@ public class Game : GameWindow
         {
             screenSpaceObject.Dispose();
         }
-        shadowMap.Dispose();
+        //shadowMap.Dispose();
         /*
         foreach(GameObject gameObject in UnlitObjects)
         {
@@ -601,6 +610,7 @@ public class Game : GameWindow
         _gausShader.Dispose();
         _testingShader.Dispose();
         _shadowShader.Dispose();
+        _fogShader.Dispose();
             
         base.OnUnload();
     }
@@ -624,20 +634,17 @@ public class Game : GameWindow
         
         base.OnRenderFrame(e);
 
-        shadowMap.BindFBO();
+        //shadowMap.BindFBO();
+
+        ScreenSpaceObjects[cycle].BindFBO();
 
         float near_plane = 0.1f, far_plane = 100.0f;
         Matrix4 lightProjection = Matrix4.CreateOrthographicOffCenter(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
         Matrix4 lightView = Matrix4.LookAt(Vector3.UnitY*10f, Vector3.Zero, Vector3.UnitY);
         Matrix4 lightSpaceMatrix = lightProjection * lightView;
-
+        
         GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-        // ScreenSpaceObjects[cycle].BindFBO();
-        
-        // GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        // GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
             
         x += (float)e.Time;
         
@@ -795,7 +802,7 @@ public class Game : GameWindow
             _shadowShader.Use();
             int id = _shadowShader.GetUniformLocation("resolution");
             GL.Uniform2(id, new Vector2(_width, _height));
-            shadowMap.Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 1)
         {
@@ -810,66 +817,66 @@ public class Game : GameWindow
             if (id != -1) GL.Uniform1(id, whiteBalance ? 1 : 0);
             id = _postProcessShader.GetUniformLocation("colorCorrectionEnabled");
             if (id != -1) GL.Uniform1(id, colorCorrect ? 1 : 0);
-            ScreenSpaceObjects[0].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 2)
         {
             _colorCorrectShader.Use();
-            ScreenSpaceObjects[1].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 3)
         {
             _filmgrainShader.Use();
             int id = _filmgrainShader.GetUniformLocation("time");
             if (id != -1) GL.Uniform1(id, x);
-            ScreenSpaceObjects[2].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 4)
         {
             _vignetteShader.Use();
-            ScreenSpaceObjects[3].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 5)
         {
             _pixelShader.Use();
             int id = _pixelShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
-            ScreenSpaceObjects[4].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 6)
         {
             _kuwaharaShader.Use();
             int id = _kuwaharaShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
-            ScreenSpaceObjects[5].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 7)
         {
             _sketchShader.Use();
             int id = _sketchShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
-            ScreenSpaceObjects[6].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 8)
         {
             _toonShader.Use();
             int id = _toonShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
-            ScreenSpaceObjects[7].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 9)
         {
             _chromaticShader.Use();
             int id = _chromaticShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
-            ScreenSpaceObjects[8].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 10)
         {
             _gausShader.Use();
             int id = _gausShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
-            ScreenSpaceObjects[9].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 11)
         {
@@ -878,7 +885,7 @@ public class Game : GameWindow
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             id = _testingShader.GetUniformLocation("iTime");
             if (id != -1) GL.Uniform1(id, x);
-            ScreenSpaceObjects[10].Render();
+            ScreenSpaceObjects[cycle].Render();
         }
 
         if (cycle == 12)
@@ -888,7 +895,14 @@ public class Game : GameWindow
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             id = _rainShader.GetUniformLocation("time");
             if (id != -1) GL.Uniform1(id, x);
-            ScreenSpaceObjects[11].Render();
+            ScreenSpaceObjects[cycle].Render();
+        }
+        if (cycle == 13)
+        {
+            _fogShader.Use();
+            int id = _fogShader.GetUniformLocation("resolution");
+            if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
+            ScreenSpaceObjects[cycle].Render();
         }
         
         SwapBuffers();
@@ -911,7 +925,7 @@ public class Game : GameWindow
         if(KeyboardState.IsKeyDown(Keys.Tab) && cooldown > .2f)
         {
             cycle++;
-            if (cycle > ScreenSpaceObjects.Count)
+            if (cycle > ScreenSpaceObjects.Count - 1)
             {
                 cycle = 0;
             }
