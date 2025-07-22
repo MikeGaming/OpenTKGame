@@ -2,9 +2,9 @@
 
 // This is the uniform buffer that contains all of the settings we sent over from the cpu in _render_callback. Must match with the one in the fragment shader.
 uniform mat4 model;
-uniform mat4 lightSpaceMatrix;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat4 lightSpaceMatrix;
 uniform vec3 viewPos;
 uniform float _GradientRotation;
 uniform float _NoiseRotation;
@@ -36,6 +36,7 @@ in vec2 UVs;
 out vec3 pos;
 out vec2 UV0;
 out vec3 Normals;
+out vec4 FragPosLightSpace;
 //out float vHeight;
 
 #define PI 3.141592653589793238462
@@ -199,4 +200,6 @@ void main() {
     Normals = vertexNormals  * mat3(transpose(inverse(model)));
     UV0 = UVs * _Scale;
     pos = vec3(newPos);
+
+	FragPosLightSpace = lightSpaceMatrix * newPos;
 }

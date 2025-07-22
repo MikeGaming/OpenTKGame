@@ -29,6 +29,7 @@ uniform int numPointLights;
 in vec2 UV0;
 in vec3 pos;
 in vec3 Normals;
+in vec4 FragPosLightSpace;
 
 vec3 normals;
 
@@ -48,62 +49,94 @@ struct PointLight
 
 
 uniform vec3 _directionalLightColor;
-uniform vec3 _directionalLightDir;
+uniform vec3 _directionalLightPos;
 uniform float _directionalLightIntensity;
 
 uniform sampler2D waterTexture;
 uniform sampler2D grassTexture;
 uniform sampler2D rockTexture;
 
+uniform sampler2D shadowMap;
+
 uniform PointLight pointLights[10];
 
 vec4 colorTex;
+vec3 lightDir;
+
+float calculateShadow()
+{
+    // 1. Perform perspective divide
+    vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
+
+    // 2. Transform from [-1,1] range to [0,1] texture coordinate range
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // 3. Get the closest depth from the light's perspective (from the shadow map)
+    float closestDepth = texture(shadowMap, projCoords.xy).r;
+
+    // 4. Get the current fragment's depth from the light's perspective
+    float currentDepth = projCoords.z;
+
+    // 5. Add a small bias to prevent "shadow acne"
+    float bias = max(0.05 * (1.0 - dot(normals, lightDir)), 0.005);
+
+    // 6. Check if the current fragment is further away than the closest depth
+    // If it is, then it's in shadow. PCF can be used here for soft shadows.
+    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+
+    //Prevent shadows on back faces when light is behind object
+    if(projCoords.z > 1.0) shadow = 0.0;
+
+    return shadow;
+}
 
 vec3 HandleLighting()
 {
     vec3 outCol;
 
-    for(int i = 0; i < numPointLights; i++)
-    {
+    // for(int i = 0; i < numPointLights; i++)
+    // {
 
-        const PointLight currentLight = pointLights[i];
+    //     const PointLight currentLight = pointLights[i];
 
-        float ambientStrength = 0.2f; //does not change
-        vec3 ambient = ambientStrength * currentLight.lightColor;
+    //     float ambientStrength = 0.2; //does not change
+    //     vec3 ambient = ambientStrength * currentLight.lightColor;
 
-        vec3 norms = normalize(normals); //no magnitude to them, cant make the light brighter
-        vec3 lightDir = normalize(currentLight.lightPos - pos); //direction of light
+    //     vec3 norms = normalize(normals); //no magnitude to them, cant make the light brighter
+    //     lightDir = normalize(currentLight.lightPos - pos); //direction of light
 
-        float diff = max(dot(norms, lightDir), 0); //diffuse light - max of the dot product (angle between normal and light direction). Value between -1 and 1. 1 is facing, -1 is nto facing and 0 is perpendicular.
-        vec3 diffuse = diff * currentLight.lightColor * vec3(colorTex); //diffuse light color
+    //     float diff = max(dot(norms, lightDir), 0); //diffuse light - max of the dot product (angle between normal and light direction). Value between -1 and 1. 1 is facing, -1 is nto facing and 0 is perpendicular.
+    //     vec3 diffuse = diff * currentLight.lightColor * vec3(colorTex); //diffuse light color
 
-        diffuse = vec3(min(diffuse.x, 1), min(diffuse.y, 1), min(diffuse.z, 1));
+    //     diffuse = vec3(min(diffuse.x, 1), min(diffuse.y, 1), min(diffuse.z, 1));
 
-        const float shininess = 128;
-        float specularStrength = 0.5f; // between 0 - 1
-        vec3 viewDir = normalize(viewPos - pos); //direction of view.  if eye is 90 degrees from reflection of light then it reflects right back. basicaly any angle of the object 90 from your eye you will see shine
-        vec3 reflectionDirection = reflect(-lightDir, norms); //reflects the light direction off the normal
-        float spec = pow(max(dot(viewDir, reflectionDirection), 0), shininess); //specular lightce
-        vec3 specular = specularStrength * spec * currentLight.lightColor; //specular light color
+    //     const float shininess = 128;
+    //     float specularStrength = 0.5; // between 0 - 1
+    //     vec3 viewDir = normalize(viewPos - pos); //direction of view.  if eye is 90 degrees from reflection of light then it reflects right back. basicaly any angle of the object 90 from your eye you will see shine
+    //     vec3 reflectionDirection = reflect(-lightDir, norms); //reflects the light direction off the normal
+    //     float spec = pow(max(dot(viewDir, reflectionDirection), 0), shininess); //specular lightce
+    //     vec3 specular = specularStrength * spec * currentLight.lightColor; //specular light color
 
-        outCol += (ambient + diffuse + specular) * currentLight.lightIntensity;
-    }
+    //     outCol += (ambient + diffuse + specular) * currentLight.lightIntensity;
+    // }
 
 	// Handle directional light
-	float ambientStrength = 0.2f; // Ambient light strength
+	float ambientStrength = 0.15; // Ambient light strength
 	vec3 ambient = ambientStrength * _directionalLightColor;
-	vec3 norms = normalize(normals); // Normalized normals
-	vec3 lightDir = normalize(_directionalLightDir); // Direction of directional light (pointing towards the light source)
-	float diff = max(dot(norms, lightDir), 0); // Diffuse light
-	vec3 diffuse = diff * _directionalLightColor * vec3(colorTex); // Diffuse light color
-	diffuse = vec3(min(diffuse.x, 1), min(diffuse.y, 1), min(diffuse.z, 1));
-	const float shininess = 128;
-	float specularStrength = 0.5f; // Specular light strength
+	vec3 norms = normalize(Normals); // Normalized normals
+	lightDir = normalize(_directionalLightPos - pos); // Direction of directional light (pointing towards the light source)
+	float diff = max(dot(lightDir, norms), 0.0); // Diffuse light
+	vec3 diffuse = diff * _directionalLightColor; // Diffuse light color
+	//diffuse = vec3(min(diffuse.x, 1), min(diffuse.y, 1), min(diffuse.z, 1));
+	const float shininess = 64;
+	float specularStrength = 0.5; // Specular light strength
 	vec3 viewDir = normalize(viewPos - pos); // Direction of view
-	vec3 reflectionDirection = reflect(-lightDir, norms); // Reflects the light direction off the normal
-	float spec = pow(max(dot(viewDir, reflectionDirection), 0), shininess); // Specular light
+	vec3 halfwayDir = normalize(lightDir + viewDir); // Reflects the light direction off the normal
+	float spec = pow(max(dot(viewDir, halfwayDir), 0), shininess); // Specular light
 	vec3 specular = specularStrength * spec * vec3(1,1,1); // Specular light color
-	outCol += (ambient + diffuse + specular) * _directionalLightIntensity;
+	
+	float shadow = calculateShadow();
+	outCol += (ambient + (1.0 - shadow) * (diffuse + specular)) * _directionalLightIntensity * _directionalLightColor;
 
     return outCol;
 }

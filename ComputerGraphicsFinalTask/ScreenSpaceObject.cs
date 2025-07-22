@@ -131,6 +131,13 @@ public class ScreenSpaceObject
         GL.Enable(EnableCap.DepthTest);
     }
 
+    public void BindDBO()
+    {
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, _frameBufferObject);
+        //GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        GL.Clear(ClearBufferMask.DepthBufferBit);
+    }
+
     public void Dispose()
     {
         GL.DeleteBuffer(_elementBufferObject);

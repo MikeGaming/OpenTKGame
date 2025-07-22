@@ -54,20 +54,19 @@ public class GameObject
         GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
     }
 
-    public void Render()
+    public void Render(Shader renderShader)
     {
-        MyShader.Use();
+        renderShader.Use();
         
-        int id = MyShader.GetUniformLocation("model");
-        GL.UniformMatrix4(id, true, ref Transform.GetMatrix);
-        id = MyShader.GetUniformLocation("view");
-        GL.UniformMatrix4(id, true, ref Game.View);
-        id = MyShader.GetUniformLocation("projection");
-        GL.UniformMatrix4(id, true, ref Game.Projection);
-        
-     
-        id = MyShader.GetUniformLocation("viewPos");
-        GL.Uniform3(id, Game.GameCam.Position);
+        int id = renderShader.GetUniformLocation("model");
+        if (id != -1) GL.UniformMatrix4(id, true, ref Transform.GetMatrix);
+        id = renderShader.GetUniformLocation("view");
+        if (id != -1) GL.UniformMatrix4(id, true, ref Game.View);
+        id = renderShader.GetUniformLocation("projection");
+        if (id != -1) GL.UniformMatrix4(id, true, ref Game.Projection);
+
+        id = renderShader.GetUniformLocation("viewPos");
+        if (id != -1) GL.Uniform3(id, Game.GameCam.Position);
         
         StaticUtilities.CheckError("render");
         

@@ -4,6 +4,7 @@ out vec4 fragColor;
 
 in vec2 UV0;
 uniform sampler2D screenTexture;
+uniform sampler2D depthTexture;
 uniform vec2 resolution;
 uniform bool bloomEnabled, exposureEnabled, whiteBalanceEnabled, colorCorrectionEnabled;
 

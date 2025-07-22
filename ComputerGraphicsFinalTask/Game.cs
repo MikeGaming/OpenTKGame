@@ -76,8 +76,9 @@ public class Game : GameWindow
     public static DirectionalLight directionalLight = null!; // Initialized in OnLoad
 
     private Shader _shadowShader;
+    private Shader _depthShader;
     // public static ShadowMap shadowMap = null!;
-        
+
     public static Matrix4 View;
     public static Matrix4 Projection;
 
@@ -144,6 +145,7 @@ public class Game : GameWindow
         _gausShader = new Shader("PostProcess/gausShader.vert", "PostProcess/gausShader.frag");
         _testingShader = new Shader("PostProcess/testingShader.vert", "PostProcess/testingShader.frag");
         _shadowShader = new Shader("shadows.vert", "shadows.frag");
+        _depthShader = new Shader("depth.vert", "depth.frag");
         _fogShader = new Shader("PostProcess/fogShader.vert", "PostProcess/fogShader.frag");
         
         //CREATE TEXTURES
@@ -192,10 +194,10 @@ public class Game : GameWindow
         //Lights
         Lights.Add(new PointLight(new Vector3(1,1,1), 1f));
         Lights[0].Transform.Position = new Vector3(5f, 10f, 1f);
-        directionalLight = new DirectionalLight(new Vector3(1,1,1), 1f);
-        directionalLight.Transform.Position = new Vector3(0, 10f, 0);
-        directionalLight.Transform.Rotation = new Vector3(-MathHelper.PiOver2, 0, 0); // Pointing downwards
-        
+        directionalLight = new DirectionalLight(new Vector3(1,0,0), 5f);
+        directionalLight.Transform.Position = new Vector3(10f, 10f, 0f);
+        directionalLight.Transform.Rotation = new Vector3(-MathHelper.PiOver4, -MathHelper.PiOver2, 0f);
+
         //CAR MODEL STUFF
         _carLitShader.Use();
             
@@ -221,7 +223,7 @@ public class Game : GameWindow
             foreach(GameObject modelParts in CarModelObjects)
             {
                 modelParts.Transform.Scale = new Vector3(1f, 1f, 1f);
-                modelParts.Transform.Position = new Vector3(4, 2, 0);
+                modelParts.Transform.Position = new Vector3(10, 10, 0);
                 //modelParts.Transform.Rotation = new Vector3(0, 0, 0);
                 LitObjects.Add(modelParts.Transform);
             }
@@ -368,7 +370,7 @@ public class Game : GameWindow
                     terrainIndices[index + 5] = (uint)(z * side_length + x + 1);
                 }
             }
-            TerrainObjects.Add(new TerrainObject(terrainVertices, terrainIndices, _terrainShader));
+            TerrainObjects.Add(new TerrainObject(terrainVertices, terrainIndices, _terrainShader, _depthShader));
             TerrainObjects[TerrainObjects.Count - 1].Transform.Scale = new Vector3(1f, 1f, 1f);
             TerrainObjects[TerrainObjects.Count - 1].Transform.Position = new Vector3(0, 0f, 0);
             TerrainObjects[TerrainObjects.Count - 1].Transform.Rotation = new Vector3(0, 0, 0);
@@ -610,6 +612,7 @@ public class Game : GameWindow
         _gausShader.Dispose();
         _testingShader.Dispose();
         _shadowShader.Dispose();
+        _depthShader.Dispose();
         _fogShader.Dispose();
             
         base.OnUnload();
@@ -634,28 +637,44 @@ public class Game : GameWindow
         
         base.OnRenderFrame(e);
 
-        //shadowMap.BindFBO();
+        View = GameCam.GetViewMatrix();
+        Projection = GameCam.GetProjectionMatrix();
+
+        // SHADOW MAP STUFF
+        float near_plane = 1.0f, far_plane = 7.5f;
+        Matrix4 lightProjection = Matrix4.CreateOrthographicOffCenter(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        Matrix4 lightView = Matrix4.LookAt(directionalLight.Transform.Position, Vector3.Zero, Vector3.UnitY);
+
+        Matrix4 lightSpaceMatrix = lightProjection * lightView;
+
+        _depthShader.Use();
+        int id = _depthShader.GetUniformLocation("lightSpaceMatrix");
+        GL.UniformMatrix4(id, false, ref lightSpaceMatrix);
+        ScreenSpaceObjects[cycle].BindDBO();
+
+        for (int j = 0; j < CarModelObjects.Count; j++) CarModelObjects[j].Render(_depthShader);
+        for (int j = 0; j < AnimeGirlObjects.Count; j++) AnimeGirlObjects[j].Render(_depthShader);
+        for (int j = 0; j < TerrainObjects.Count; j++) TerrainObjects[j].Render(_depthShader);
+        for (int j = 0; j < WaterObjects.Count; j++) WaterObjects[j].Render(_depthShader);
+        for (int j = 0; j < BillboardTreeObjects.Count; j++) BillboardTreeObjects[j].Render(_depthShader);
+        for (int j = 0; j < FlipbookObjects.Count; j++) FlipbookObjects[j].Render(_depthShader);
+        for (int j = 0; j < TerrainObjects.Count; j++) TerrainObjects[j].Render(_depthShader);
+
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
 
         ScreenSpaceObjects[cycle].BindFBO();
 
-        float near_plane = 0.1f, far_plane = 100.0f;
-        Matrix4 lightProjection = Matrix4.CreateOrthographicOffCenter(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
-        Matrix4 lightView = Matrix4.LookAt(Vector3.UnitY*10f, Vector3.Zero, Vector3.UnitY);
-        Matrix4 lightSpaceMatrix = lightProjection * lightView;
-        
         GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            
+
         x += (float)e.Time;
         
-        View = GameCam.GetViewMatrix();
-        Projection = GameCam.GetProjectionMatrix();
             
         for(int j = 0; j < CarModelObjects.Count; j++)
         {
             CarModelObjects[j].MyShader.Use();
             _carModelTextures[j].Use(_carTextureUnits[j]);
-            int id = CarModelObjects[j].MyShader.GetUniformLocation("modelIndex");
+            id = CarModelObjects[j].MyShader.GetUniformLocation("modelIndex");
             if (id != -1) GL.Uniform1(id, j);
             for (int i = 0; i < Lights.Count; i++)
             {
@@ -676,7 +695,7 @@ public class Game : GameWindow
                 
             id = CarModelObjects[j].MyShader.GetUniformLocation("numPointLights");
             if (id != -1) GL.Uniform1(id, Lights.Count);
-            CarModelObjects[j].Render();
+            CarModelObjects[j].Render(_carLitShader);
             
         }
             
@@ -684,7 +703,7 @@ public class Game : GameWindow
         {
             AnimeGirlObjects[j].MyShader.Use();
             _animeGirlTextures[j].Use(_animeGirlTextureUnits[j]);
-            int id = AnimeGirlObjects[j].MyShader.GetUniformLocation("modelIndex");
+            id = AnimeGirlObjects[j].MyShader.GetUniformLocation("modelIndex");
             if (id != -1) GL.Uniform1(id, j);
             id = AnimeGirlObjects[j].MyShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
@@ -707,7 +726,7 @@ public class Game : GameWindow
                 
             id = AnimeGirlObjects[j].MyShader.GetUniformLocation("numPointLights");
             if (id != -1) GL.Uniform1(id, Lights.Count);
-            AnimeGirlObjects[j].Render();
+            AnimeGirlObjects[j].Render(_animegirlLitShader);
             
         }
         
@@ -717,7 +736,6 @@ public class Game : GameWindow
             _waterTexture.Use(TextureUnit.Texture10);
             _grassTexture.Use(TextureUnit.Texture11);
             _stoneTexture.Use(TextureUnit.Texture12);
-            int id;
             for (int i = 0; i < Lights.Count; i++)
             {
                 PointLight currentLight = Lights[i];
@@ -739,13 +757,15 @@ public class Game : GameWindow
             if (id != -1) GL.Uniform1(id, Lights.Count);
             id = _terrainShader.GetUniformLocation("_directionalLightColor");
             if (id != -1) GL.Uniform3(id, directionalLight.Color);
-            id = _terrainShader.GetUniformLocation("_directionalLightDir");
-            if (id != -1) GL.Uniform3(id, directionalLight.Transform.Forward);
+            id = _terrainShader.GetUniformLocation("_directionalLightPos");
+            if (id != -1) GL.Uniform3(id, directionalLight.Transform.Position);
             id = _terrainShader.GetUniformLocation("_directionalLightIntensity");
             if (id != -1) GL.Uniform1(id, directionalLight.Intensity);
-            id = _terrainShader.GetUniformLocation("lightSpaceMatrix");
+            id = TerrainObjects[j].MyShader.GetUniformLocation("lightSpaceMatrix");
             GL.UniformMatrix4(id, false, ref lightSpaceMatrix);
-            TerrainObjects[j].Render();
+            id = TerrainObjects[j].MyShader.GetUniformLocation("shadowMap");
+            GL.Uniform1(id, 30);
+            TerrainObjects[j].Render(_terrainShader);
             
         }
         
@@ -757,7 +777,7 @@ public class Game : GameWindow
         {
             WaterObjects[j].MyShader.Use();
             _waterTexture.Use(TextureUnit.Texture10);
-            int id = WaterObjects[j].MyShader.GetUniformLocation("time");
+            id = WaterObjects[j].MyShader.GetUniformLocation("time");
             if (id != -1) GL.Uniform1(id, x);
             for (int i = 0; i < Lights.Count; i++)
             {
@@ -778,7 +798,7 @@ public class Game : GameWindow
                 
             id = WaterObjects[j].MyShader.GetUniformLocation("numPointLights");
             if (id != -1) GL.Uniform1(id, Lights.Count);
-            WaterObjects[j].Render();
+            WaterObjects[j].Render(_waterShader);
             
         }
         
@@ -786,7 +806,7 @@ public class Game : GameWindow
         {
             BillboardTreeObjects[i].MyShader.Use();
             _billboardTreeTexture.Use(TextureUnit.Texture8);
-            BillboardTreeObjects[i].Render();
+            BillboardTreeObjects[i].Render(_billboardTreeShader);
         }
         
         for(int i = 0; i < FlipbookObjects.Count; i++)
@@ -794,20 +814,24 @@ public class Game : GameWindow
             FlipbookObjects[i].MyShader.Use();
             _flipbookTexture.Use(TextureUnit.Texture9);
             GL.Uniform1(FlipbookObjects[i].MyShader.GetUniformLocation("time"), x);
-            FlipbookObjects[i].Render();
+            FlipbookObjects[i].Render(_flipbookShader);
         }
+
+
+
+
 
         if (cycle == 0)
         {
             _shadowShader.Use();
-            int id = _shadowShader.GetUniformLocation("resolution");
+            id = _shadowShader.GetUniformLocation("resolution");
             GL.Uniform2(id, new Vector2(_width, _height));
             ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 1)
         {
             _postProcessShader.Use();
-            int id = _postProcessShader.GetUniformLocation("resolution");
+            id = _postProcessShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             id = _postProcessShader.GetUniformLocation("bloomEnabled");
             if (id != -1) GL.Uniform1(id, bloom ? 1 : 0);
@@ -827,7 +851,7 @@ public class Game : GameWindow
         if (cycle == 3)
         {
             _filmgrainShader.Use();
-            int id = _filmgrainShader.GetUniformLocation("time");
+            id = _filmgrainShader.GetUniformLocation("time");
             if (id != -1) GL.Uniform1(id, x);
             ScreenSpaceObjects[cycle].Render();
         }
@@ -839,49 +863,49 @@ public class Game : GameWindow
         if (cycle == 5)
         {
             _pixelShader.Use();
-            int id = _pixelShader.GetUniformLocation("resolution");
+            id = _pixelShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 6)
         {
             _kuwaharaShader.Use();
-            int id = _kuwaharaShader.GetUniformLocation("resolution");
+            id = _kuwaharaShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 7)
         {
             _sketchShader.Use();
-            int id = _sketchShader.GetUniformLocation("resolution");
+            id = _sketchShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 8)
         {
             _toonShader.Use();
-            int id = _toonShader.GetUniformLocation("resolution");
+            id = _toonShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 9)
         {
             _chromaticShader.Use();
-            int id = _chromaticShader.GetUniformLocation("resolution");
+            id = _chromaticShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 10)
         {
             _gausShader.Use();
-            int id = _gausShader.GetUniformLocation("resolution");
+            id = _gausShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             ScreenSpaceObjects[cycle].Render();
         }
         if (cycle == 11)
         {
             _testingShader.Use();
-            int id = _testingShader.GetUniformLocation("resolution");
+            id = _testingShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             id = _testingShader.GetUniformLocation("iTime");
             if (id != -1) GL.Uniform1(id, x);
@@ -891,7 +915,7 @@ public class Game : GameWindow
         if (cycle == 12)
         {
             _rainShader.Use();
-            int id = _rainShader.GetUniformLocation("resolution");
+            id = _rainShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             id = _rainShader.GetUniformLocation("time");
             if (id != -1) GL.Uniform1(id, x);
@@ -900,7 +924,7 @@ public class Game : GameWindow
         if (cycle == 13)
         {
             _fogShader.Use();
-            int id = _fogShader.GetUniformLocation("resolution");
+            id = _fogShader.GetUniformLocation("resolution");
             if (id != -1) GL.Uniform2(id, new Vector2(_width, _height));
             ScreenSpaceObjects[cycle].Render();
         }
@@ -956,7 +980,7 @@ public class Game : GameWindow
         
         if (KeyboardState.IsKeyDown(Keys.LeftShift))
         {
-            tempCamSpeed = CameraSpeed * 2.0f;
+            tempCamSpeed = CameraSpeed * 20.0f;
         }
         else
         {
