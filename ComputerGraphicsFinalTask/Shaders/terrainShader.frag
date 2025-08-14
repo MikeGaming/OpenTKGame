@@ -4,6 +4,7 @@
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat4 lightSpaceMatrix;
 uniform vec3 viewPos;
 uniform float _GradientRotation;
 uniform float _NoiseRotation;

@@ -38,10 +38,6 @@ public class TerrainObject
         int id = MyShader.GetAttribLocation("vertexPosition");
         if (id != -1) GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 0);
         if (id != -1) GL.EnableVertexAttribArray(id);
-
-        id = depthShader.GetAttribLocation("vertexPosition");
-        if (id != -1) GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 0);
-        if (id != -1) GL.EnableVertexAttribArray(id);
         
         id = MyShader.GetAttribLocation("vertexNormals");
         if (id != -1) GL.VertexAttribPointer(id, 3, VertexAttribPointerType.Float, false, 8 * sizeof(float), 3 * sizeof(float));
